@@ -12,14 +12,16 @@ from tqdm import tqdm
 
 # --- Functions
 
-def help():
+def help(exit_code=0):
     print('# - Usage:')
     print('# -    python download_webnovel.py [-t epub,html] <URL-OF-SERIES>')
     print('# - Arguments:')
     print('# -    -t       output format, e.g. html, epub. can contain multiple values, seperated by comma')
     print('# -    --help   Displays this help')
-    exit()
+    exit(exit_code)
     
+def htmlescape(text):
+    return text.replace('[', ' ').replace(']', ' ')
 
 def get_novel_metadata(website_data, source_url):
     title = None
@@ -92,12 +94,14 @@ def zip_directory(directory_path, zip_path):
     with zipfile.ZipFile(zip_path, 'w') as archive:
         if os.path.exists(directory_path + os.sep + 'mimetype'):
             archive.write(directory_path + os.sep + 'mimetype', "mimetype")
+        print('# - Creating epub...')
         for root, dirs, files in os.walk(directory_path):
-            for file in files:
+            for i in tqdm(range(len(files)), desc='    Compressing files'):
+                file = files[i]
                 if file == 'mimetype':
                     continue
                 archive.write(os.path.join(root, file), 
-                           os.path.relpath(os.path.join(root, file), os.path.join(directory_path)))
+                           os.path.relpath(os.path.join(root, file), os.path.join(directory_path)), compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
 
 def output_epub(metadata, chapters):
     print('# - Publishing epub...')
@@ -120,7 +124,7 @@ def output_epub(metadata, chapters):
     ch_idx = 1
     for i in tqdm(range(len(chapters)), desc='# - Processing Chapters'):
         chapter = chapters[i]
-        chapter_title = chapter['title']
+        chapter_title = htmlescape(chapter['title'])
         chapter_content = chapter['content']
         toc.append(str(ch_idx).zfill(padding) + '.html')
         # Write Chapter HTML
@@ -149,19 +153,17 @@ def output_epub(metadata, chapters):
         <meta content="0" name="dtb:totalPageCount" />
         <meta content="0" name="dtb:maxPageNumber" />
     </head>
-    <!-- Hier kommt der Buchtitel hinein. -->
     <docTitle>
-        <text>''' + metadata['title'] + '''</text>
+        <text>''' + htmlescape(metadata['title']) + '''</text>
     </docTitle>
-    <!-- Hier kommt der Autorenname hinein. -->
     <docAuthor>
-        <text>Unknown</text>
+        <text>''' + htmlescape(metadata['author']) + '''</text>
     </docAuthor>
     <navMap>''')
             ch_idx = 1
             padding = len(str(len(chapters)))
             for chapter in chapters:
-                chapter_title = chapter['title']
+                chapter_title = htmlescape(chapter['title'])
                 chapter_content = chapter['content']
                 toc_ncx.write('''        <navPoint id="kapitel_''' + str(ch_idx) + '''" playOrder="''' + str(ch_idx) + '''">
             <navLabel>
@@ -178,13 +180,12 @@ def output_epub(metadata, chapters):
 <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uuid_id">
   <metadata xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata">
     <dc:language>en</dc:language>
-    <dc:title>''' + metadata['title'] + '''</dc:title>
-    <dc:contributor opf:role="bkp">calibre (5.35.0) [https://calibre-ebook.com]</dc:contributor>
+    <dc:title>''' + htmlescape(metadata['title']) + '''</dc:title>
+    <dc:contributor opf:role="bkp">download_webnovel.py</dc:contributor>
     <meta name="calibre:timestamp" content="2024-02-19T21:28:09.816300+00:00"/>
     <dc:identifier id="uuid_id" opf:scheme="uuid">''' + uuid_str + '''</dc:identifier>
-    <dc:identifier opf:scheme="calibre">67454d07-b70c-4a94-ac60-e797793a2849</dc:identifier>
-    <dc:creator opf:role="aut">''' + metadata['author'] + '''</dc:creator>
-    <meta name="calibre:title_sort" content="Infrasound Berserker"/>
+    <dc:creator opf:role="aut">''' + htmlescape(metadata['author']) + '''</dc:creator>
+    <meta name="calibre:title_sort" content="''' + htmlescape(metadata['title']) + '''"/>
     <dc:date>0101-01-01T00:00:00+00:00</dc:date>
     <meta name="cover" content="cover"/>
   </metadata>
@@ -246,7 +247,7 @@ source_url = 'https://www.royalroad.com' if 'www.royalroad.com' in link else 'ht
 
 if source_url is None:
     print('# - Unknown site: ' + link)
-    exit(1)
+    help(1)
  
 print('# - Reading novel from: royalroad' if 'royalroad' in source_url else '# - Reading novel from: novelhall')
 
