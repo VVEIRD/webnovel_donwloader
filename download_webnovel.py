@@ -12,6 +12,15 @@ from tqdm import tqdm
 
 # --- Functions
 
+def help():
+    print('# - Usage:')
+    print('# -    python download_webnovel.py [-t epub,html] <URL-OF-SERIES>')
+    print('# - Arguments:')
+    print('# -    -t       output format, e.g. html, epub. can contain multiple values, seperated by comma')
+    print('# -    --help   Displays this help')
+    exit()
+    
+
 def get_novel_metadata(website_data, source_url):
     title = None
     author = 'Unknown'
@@ -222,6 +231,9 @@ print('# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #')
 print('#                  Webnovel Downloader v0.1                      #')
 print('#              Supports royalroad and novelhall                  #')
 print('# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #')
+
+if '--help' in sys.argv:
+    help()
 
 if '-t' in sys.argv:
     output = sys.argv[sys.argv.index('-t')+1]
