@@ -276,14 +276,15 @@ print('# - Author:             ' + novel_metadata['author'])
 
 read_chapters = []
 chapters = []
-for i in tqdm(range(len(chapter_links)), desc='# - Downloading Chapters'):
-    link = chapter_links[i]
+chapter_links_dedup = []
+[chapter_links_dedup.append(x) for x in chapter_links if x not in chapter_links_dedup]
+for i in tqdm(range(len(chapter_links_dedup)), desc='# - Downloading Chapters'):
+    link = chapter_links_dedup[i]
     if link in read_chapters:
         continue
     read_chapters.append(link)
     chapter_title, chapter_content = get_chapter(source_url, link)
     chapters.append({'title': chapter_title, 'content': chapter_content})
-
 # --- Output
 
 if 'epub' in output:
