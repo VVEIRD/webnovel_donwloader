@@ -109,14 +109,12 @@ def output_epub(metadata, chapters):
     temp_dir = tempfile.TemporaryDirectory()
     os.mkdir(temp_dir.name + os.sep + 'META-INF')
     with open(temp_dir.name + os.sep + 'META-INF' + os.sep + 'container.xml', 'w', encoding='utf-8') as container_xml:
-        container_xml.write('''<?xml version="1.0"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-   <rootfiles>
-      <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
-      
-   </rootfiles>
-</container>
-    ''')
+        container_xml.write('''<?xml version="1.0"?>\n''')
+        container_xml.write('''<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n''')
+        container_xml.write('''<rootfiles>\n''')
+        container_xml.write('''      <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>\n''')
+        container_xml.write('''   </rootfiles>\n''')
+        container_xml.write('''</container>\n''')
     with open(temp_dir.name + os.sep + 'mimetype', 'w', encoding='utf-8') as container_xml:
         container_xml.write('''application/epub+zip''')
     toc = []
@@ -129,68 +127,64 @@ def output_epub(metadata, chapters):
         toc.append(str(ch_idx).zfill(padding) + '.html')
         # Write Chapter HTML
         with open(temp_dir.name + os.sep + str(ch_idx).zfill(padding) + '.html', 'w', encoding='utf-8') as chapter_html:
-            chapter_html.write('''<?xml version='1.0' encoding='utf-8'?>
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <title>''' + chapter_title + '''</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
-</head>
-<body>
-<div>''')
-            chapter_html.write('<h1>' + str(chapter_title) + '</h1>\r\n');
+            chapter_html.write('''<?xml version='1.0' encoding='utf-8'?>\n''')
+            chapter_html.write('''<html xmlns="http://www.w3.org/1999/xhtml">\n''')
+            chapter_html.write('''  <head>\n''')
+            chapter_html.write('''    <title>''' + chapter_title + '''</title>\n''')
+            chapter_html.write('''    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>\n''')
+            chapter_html.write('''<body>\n''')
+            chapter_html.write('''<div>''')
+            chapter_html.write('''<h1>''' + str(chapter_title) + '''</h1>\r\n''');
             chapter_html.write(str(chapter_content.replace('<br>', '<br/>')))
-            chapter_html.write('''
-</div></body></html>''')
+            chapter_html.write('''\n''')
+            chapter_html.write('''</div></body></html>''')
         ch_idx = ch_idx + 1
     # Wirte ncx file
     with open(temp_dir.name + os.sep + 'toc.ncx', 'w', encoding='utf-8') as toc_ncx:
-            toc_ncx.write('''<?xml version='1.0' encoding='UTF-8'?>
-<!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">
-<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="de">
-    <head>
-        <!-- Hier kommt die Buchidentifikation aus content.opf hinein. -->
-        <meta name="dtb:uid" content="''' + uuid_str + '''" />
-        <meta content="0" name="dtb:totalPageCount" />
-        <meta content="0" name="dtb:maxPageNumber" />
-    </head>
-    <docTitle>
-        <text>''' + htmlescape(metadata['title']) + '''</text>
-    </docTitle>
-    <docAuthor>
-        <text>''' + htmlescape(metadata['author']) + '''</text>
-    </docAuthor>
-    <navMap>''')
+            toc_ncx.write('''<?xml version='1.0' encoding='UTF-8'?>\n''')
+            toc_ncx.write('''<!DOCTYPE ncx PUBLIC "-//NISO//DTD ncx 2005-1//EN" "http://www.daisy.org/z3986/2005/ncx-2005-1.dtd">\n''')
+            toc_ncx.write('''<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1" xml:lang="de">\n''')
+            toc_ncx.write('''    <head>\n''')
+            toc_ncx.write('''        <meta name="dtb:uid" content="''' + uuid_str + '''" />\n''')
+            toc_ncx.write('''        <meta content="0" name="dtb:totalPageCount" />\n''')
+            toc_ncx.write('''        <meta content="0" name="dtb:maxPageNumber" />\n''')
+            toc_ncx.write('''    </head>\n''')
+            toc_ncx.write('''    <docTitle>\n''')
+            toc_ncx.write('''        <text>''' + htmlescape(metadata['title']) + '''</text>\n''')
+            toc_ncx.write('''    </docTitle>\n''')
+            toc_ncx.write('''    <docAuthor>\n''')
+            toc_ncx.write('''        <text>''' + htmlescape(metadata['author']) + '''</text>\n''')
+            toc_ncx.write('''    </docAuthor>\n''')
+            toc_ncx.write('''    <navMap>\n''')
             ch_idx = 1
             padding = len(str(len(chapters)))
             for chapter in chapters:
                 chapter_title = htmlescape(chapter['title'])
                 chapter_content = chapter['content']
-                toc_ncx.write('''        <navPoint id="kapitel_''' + str(ch_idx) + '''" playOrder="''' + str(ch_idx) + '''">
-            <navLabel>
-                <text>''' + chapter_title + '''</text>
-            </navLabel>
-            <content src="''' + str(ch_idx).zfill(padding) + '.html' + '''"/>
-        </navPoint>
-''')
+                toc_ncx.write('''        <navPoint id="kapitel_''' + str(ch_idx) + '''" playOrder="''' + str(ch_idx) + '''">\n''')
+                toc_ncx.write('''            <navLabel>\n''')
+                toc_ncx.write('''                <text>''' + chapter_title + '''</text>\n''')
+                toc_ncx.write('''            </navLabel>\n''')
+                toc_ncx.write('''            <content src="''' + str(ch_idx).zfill(padding) + '.html' + '''"/>\n''')
+                toc_ncx.write('''        </navPoint>\n''')
                 ch_idx = ch_idx + 1
-            toc_ncx.write('''        </navMap>
-</ncx>''')
+            toc_ncx.write('''    </navMap>\n''')
+            toc_ncx.write('''</ncx>''')
             
-    content_opf = '''<?xml version='1.0' encoding='utf-8'?>
-<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uuid_id">
-  <metadata xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata">
-    <dc:language>en</dc:language>
-    <dc:title>''' + htmlescape(metadata['title']) + '''</dc:title>
-    <dc:contributor opf:role="bkp">download_webnovel.py</dc:contributor>
-    <meta name="calibre:timestamp" content="2024-02-19T21:28:09.816300+00:00"/>
-    <dc:identifier id="uuid_id" opf:scheme="uuid">''' + uuid_str + '''</dc:identifier>
-    <dc:creator opf:role="aut">''' + htmlescape(metadata['author']) + '''</dc:creator>
-    <meta name="calibre:title_sort" content="''' + htmlescape(metadata['title']) + '''"/>
-    <dc:date>0101-01-01T00:00:00+00:00</dc:date>
-    <meta name="cover" content="cover"/>
-  </metadata>
-  <manifest>
-'''
+    content_opf =               "<?xml version='1.0' encoding='utf-8'?>\n"
+    content_opf = content_opf + '<package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="uuid_id">\n'
+    content_opf = content_opf + '  <metadata xmlns:opf="http://www.idpf.org/2007/opf" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:calibre="http://calibre.kovidgoyal.net/2009/metadata">\n'
+    content_opf = content_opf + '    <dc:language>en</dc:language>\n'
+    content_opf = content_opf + '    <dc:title>' + htmlescape(metadata['title']) + '</dc:title>\n'
+    content_opf = content_opf + '    <dc:contributor opf:role="bkp">download_webnovel.py</dc:contributor>\n'
+    content_opf = content_opf + '    <meta name="calibre:timestamp" content="2024-02-19T21:28:09.816300+00:00"/>\n'
+    content_opf = content_opf + '    <dc:identifier id="uuid_id" opf:scheme="uuid">' + uuid_str + '</dc:identifier>\n'
+    content_opf = content_opf + '    <dc:creator opf:role="aut">' + htmlescape(metadata['author']) + '</dc:creator>\n'
+    content_opf = content_opf + '    <meta name="calibre:title_sort" content="' + htmlescape(metadata['title']) + '"/>\n'
+    content_opf = content_opf + '    <dc:date>0101-01-01T00:00:00+00:00</dc:date>\n'
+    content_opf = content_opf + '    <meta name="cover" content="cover"/>\n'
+    content_opf = content_opf + '  </metadata>\n'
+    content_opf = content_opf + '  <manifest>\n'
     # Generate Manifest
     for entry in toc:
         content_opf = content_opf + '    <item id="html' + entry.replace('.html', '') + '" href="' + entry + '" media-type="application/xhtml+xml"/>\n'
