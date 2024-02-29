@@ -9,15 +9,24 @@ import time
 import zipfile
 import uuid
 from tqdm import tqdm
+import math
 
 # --- Functions
 
 def help(exit_code=0):
     print('# - Usage:')
-    print('# -    python download_webnovel.py [-t epub,html] <URL-OF-SERIES>')
+    print('# -    python download_webnovel.py [-t epub,html] [-s 100] [-o <PATH>] <URL-OF-SERIES>')
+    print('# -')
     print('# - Arguments:')
-    print('# -    -t       output format, e.g. html, epub. can contain multiple values, seperated by comma')
-    print('# -    --help   Displays this help')
+    print('# -    -t          Output format, e.g. html, epub. can contain multiple values, seperated by comma')
+    print('# -    -s <NUMBER> Split the novel into parts, the number after the parameter defines how many chapters each part has')
+    print('# -    -o <PATH>   Outputs novel to a specific path, use %i in the path when splitting the novel in seperate parts')
+    print('# -    --help      Displays this help')
+    print('# -')
+    print('# - Example:')
+    print('# -')
+    print('# -   python download_webnovel.py -s 100 -t epub -o "test\\Test Part %i.epub" https://www.royalroad.com/fiction/12345/test')
+    print()
     exit(exit_code)
     
 def htmlescape(text):
@@ -181,6 +190,10 @@ def output_epub(metadata, chapters):
     content_opf = content_opf + '    <dc:identifier id="uuid_id" opf:scheme="uuid">' + uuid_str + '</dc:identifier>\n'
     content_opf = content_opf + '    <dc:creator opf:role="aut">' + htmlescape(metadata['author']) + '</dc:creator>\n'
     content_opf = content_opf + '    <meta name="calibre:title_sort" content="' + htmlescape(metadata['title']) + '"/>\n'
+    if 'series_index' in metadata:
+        content_opf = content_opf + '    <<meta name="calibre:series_index" content="' + htmlescape(metadata['series_index']) + '"/>\n'
+    if 'series' in metadata:
+        content_opf = content_opf + '    <<meta name="calibre:series" content="' + htmlescape(metadata['series']) + '"/>\n'
     content_opf = content_opf + '    <dc:date>0101-01-01T00:00:00+00:00</dc:date>\n'
     content_opf = content_opf + '    <meta name="cover" content="cover"/>\n'
     content_opf = content_opf + '  </metadata>\n'
@@ -201,13 +214,14 @@ def output_epub(metadata, chapters):
     # Write mimetype file
     with open(temp_dir.name + os.sep + 'mimetype', 'w', encoding='utf-8') as container_xml:
         container_xml.write('''application/epub+zip''')
-    zip_directory(temp_dir.name, metadata['title'] + '.epub')
+    print(metadata)
+    zip_directory(temp_dir.name, metadata['file_name']['epub'])
     temp_dir.cleanup()
     print('# - Epub created: ' + metadata['title'] + '.epub')
 
 def output_html(metadata, chapters):
     print('# - Publishing html...')
-    with open( metadata['title'] + '.html', 'w', encoding='utf-8') as book_file:
+    with open( metadata['file_name']['html'], 'w', encoding='utf-8') as book_file:
         book_file.write('<html><body>\r\n');
         for i in tqdm(range(len(chapters)), desc='# - Processing Chapters'):
             chapter = chapters[i]
@@ -227,11 +241,33 @@ print('#                  Webnovel Downloader v0.1                      #')
 print('#              Supports royalroad and novelhall                  #')
 print('# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #')
 
+segmentate = False
+chapter_per_segment = 100
+output_override = False
+output = 'epub'
+
 if '--help' in sys.argv:
     help()
 
+# Change the output type
 if '-t' in sys.argv:
     output = sys.argv[sys.argv.index('-t')+1]
+
+# Split Novel into Segments of Chapters
+if '-s' in sys.argv:
+    try:
+        segmentate = True
+        chapter_per_segment = int(sys.argv[sys.argv.index('-s')+1])
+    except ValueError as valErr:
+        print('# - Argument after -s must be an integer (you provided: {arg})'.format(arg=sys.argv[sys.argv.index('-s')+1]))
+        print('# - exiting...')
+        exit(2)
+        
+
+# Change the output destination
+if '-o' in sys.argv:
+    output_override = True
+    output = sys.argv[sys.argv.index('-o')+1]
 
 print('# - Output(s) selected: ' + output)
 
@@ -262,7 +298,10 @@ book = Selector(website_data)
 
 novel_metadata = get_novel_metadata(website_data, source_url)
 chapter_links = get_chapters(website_data, source_url)
-
+novel_metadata['file_name'] = dict(
+    epub = (novel_metadata['title'] if not output_override else output) + '.epub',
+    html = (novel_metadata['title'] if not output_override else output) + '.html'
+)
 
 print('# - Book Title:         ' + novel_metadata['title']) 
 print('# - Author:             ' + novel_metadata['author']) 
@@ -273,17 +312,68 @@ read_chapters = []
 chapters = []
 chapter_links_dedup = []
 [chapter_links_dedup.append(x) for x in chapter_links if x not in chapter_links_dedup]
-for i in tqdm(range(len(chapter_links_dedup)), desc='# - Downloading Chapters'):
+for i in tqdm(range(len(chapter_links_dedup)), desc='# - Downloading Chapters', unit='Ch'):
     link = chapter_links_dedup[i]
     if link in read_chapters:
         continue
     read_chapters.append(link)
     chapter_title, chapter_content = get_chapter(source_url, link)
     chapters.append({'title': chapter_title, 'content': chapter_content})
-# --- Output
 
-if 'epub' in output:
-    output_epub(novel_metadata, chapters)
-if 'html' in output:
-    output_html(novel_metadata, chapters)
+# --- Split chapters fur segmentation
+parts = []
+if segmentate:
+    segment = []
+    part = 1
+    part_padding = len(str(math.ceil((len(chapters)+0.0)/chapter_per_segment)))
+    for i in range(len(chapters)):
+        if len(segment) < chapter_per_segment:
+            segment.append(chapters[i])
+        else:
+            part_name = novel_metadata['title'] + ' Part ' + str(part).zfill(part_padding)
+            file_names = dict(
+                epub = (part_name if not output_override else output.replace('%i', str(part).zfill(part_padding))) + '.epub',
+                html = (part_name if not output_override else output.replace('%i', str(part).zfill(part_padding))) + '.html'
+            )
+            file_names['epub'] = file_names['epub'].replace('.epub.epub', '.epub')
+            file_names['epub'] = file_names['epub'].replace('.html.epub', '.epub')
+            file_names['html'] = file_names['html'].replace('.html.html', '.html')
+            file_names['html'] = file_names['html'].replace('.epub.html', '.html')
+            part_metadata = dict(
+                title = part_name,
+                author = novel_metadata['author'],
+                series = novel_metadata['title'],
+                series_index = str(part),
+                file_name = file_names
+            )
+            parts.append({'metadata': part_metadata, 'chapters': segment})
+            part = part + 1
+            segment = []
+    if len(segment) > 0:
+        file_names = dict(
+            epub = (part_name if not output_override else output.replace('%i', str(part).zfill(part_padding))) + '.epub',
+            html = (part_name if not output_override else output.replace('%i', str(part).zfill(part_padding))) + '.html'
+        )
+        file_names['epub'] = file_names['epub'].replace('.epub.epub', '.epub')
+        file_names['epub'] = file_names['epub'].replace('.html.epub', '.epub')
+        file_names['html'] = file_names['html'].replace('.html.html', '.html')
+        file_names['html'] = file_names['html'].replace('.epub.html', '.html')
+        part_metadata = dict(
+            title = novel_metadata['title'] + ' Part ' + str(part).zfill(part_padding),
+            author = novel_metadata['author'],
+            series = novel_metadata['title'],
+            series_index = str(part),
+            file_name = file_names
+        )
+        parts.append({'metadata': part_metadata, 'chapters': segment})
+else:
+    parts.append({'metadata': novel_metadata, 'chapters': chapters})
+
+
+# --- Output
+for part in parts:
+    if 'epub' in output:
+        output_epub(part['metadata'], part['chapters'])
+    if 'html' in output:
+        output_epub(part['metadata'], part['chapters'])
     
