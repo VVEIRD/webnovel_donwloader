@@ -237,7 +237,7 @@ def output_html(metadata, chapters):
 output = 'epub'
 
 print('# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #')
-print('#                  Webnovel Downloader v0.1                      #')
+print('#                  Webnovel Downloader v0.2                      #')
 print('#              Supports royalroad and novelhall                  #')
 print('# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #')
 
