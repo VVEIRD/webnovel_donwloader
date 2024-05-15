@@ -10,8 +10,28 @@ import zipfile
 import uuid
 from tqdm import tqdm
 import math
+from pathlib import Path
+import json
+import re
 
 # --- Functions
+
+cache_dir = os.path.join(str(Path.home()), ".webnove_downlaoder", "cache")
+
+def get_cached_chapter(novel, chapter_name):
+    cached_chapter = os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel), re.sub(r'[^\w_. -]', '_', chapter_name))
+    if os.path.isfile(cached_chapter):
+        with open(cached_chapter, 'r', encoding='utf-8') as cached_file:
+            return json.load(cached_file)
+    return None
+
+def write_cached_chapter(novel, chapter_name, content):
+    cached_chapter = os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel), re.sub(r'[^\w_. -]', '_', chapter_name))
+    os.makedirs(os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel)), exist_ok=True)
+    with open(cached_chapter, 'w', encoding='utf-8') as cached_file:
+        cached_file.write(json.dumps(content))
+    return content
+
 
 def help(exit_code=0):
     print('# - Usage:')
@@ -214,7 +234,7 @@ def output_epub(metadata, chapters):
     # Write mimetype file
     with open(temp_dir.name + os.sep + 'mimetype', 'w', encoding='utf-8') as container_xml:
         container_xml.write('''application/epub+zip''')
-    print(metadata)
+    #print(metadata)
     zip_directory(temp_dir.name, metadata['file_name']['epub'])
     temp_dir.cleanup()
     print('# - Epub created: ' + metadata['title'] + '.epub')
@@ -317,7 +337,12 @@ for i in tqdm(range(len(chapter_links_dedup)), desc='# - Downloading Chapters', 
     if link in read_chapters:
         continue
     read_chapters.append(link)
-    chapter_title, chapter_content = get_chapter(source_url, link)
+    chapter = get_cached_chapter(novel_metadata['title'], link)
+    if chapter is not None:
+        chapter_title, chapter_content = chapter
+    else:
+        chapter_title, chapter_content = get_chapter(source_url, link)
+        write_cached_chapter(novel_metadata['title'], link, {'title': chapter_title, 'content': chapter_content})
     chapters.append({'title': chapter_title, 'content': chapter_content})
 
 # --- Split chapters fur segmentation
