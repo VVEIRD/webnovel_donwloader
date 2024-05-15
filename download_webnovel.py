@@ -235,13 +235,15 @@ def output_epub(metadata, chapters):
     with open(temp_dir.name + os.sep + 'mimetype', 'w', encoding='utf-8') as container_xml:
         container_xml.write('''application/epub+zip''')
     #print(metadata)
-    zip_directory(temp_dir.name, metadata['file_name']['epub'])
+    epub_file = re.sub(r'[^\w_. -]', '_', metadata['file_name']['epub'])
+    zip_directory(temp_dir.name, epub_file)
     temp_dir.cleanup()
-    print('# - Epub created: ' + metadata['title'] + '.epub')
+    print('# - Epub created: ' + epub_file)
 
 def output_html(metadata, chapters):
     print('# - Publishing html...')
-    with open( metadata['file_name']['html'], 'w', encoding='utf-8') as book_file:
+    html_file = re.sub(r'[^\w_. -]', '_', metadata['file_name']['html'])
+    with open( html_file, 'w', encoding='utf-8') as book_file:
         book_file.write('<html><body>\r\n');
         for i in tqdm(range(len(chapters)), desc='# - Processing Chapters'):
             chapter = chapters[i]
@@ -250,7 +252,7 @@ def output_html(metadata, chapters):
             book_file.write(str(chapter['content']))
             book_file.write('</div>\r\n');
         book_file.write('</body></html>\r\n');  
-    print('# - HTML created: ' + metadata['title'] + '.html')  
+    print('# - HTML created: ' + html_file)  
 
 # --- Main Programm
 
@@ -339,7 +341,7 @@ for i in tqdm(range(len(chapter_links_dedup)), desc='# - Downloading Chapters', 
     read_chapters.append(link)
     chapter = get_cached_chapter(novel_metadata['title'], link)
     if chapter is not None:
-        chapter_title, chapter_content = chapter
+        chapter_title, chapter_content = [chapter['title'], chapter['content']]
     else:
         chapter_title, chapter_content = get_chapter(source_url, link)
         write_cached_chapter(novel_metadata['title'], link, {'title': chapter_title, 'content': chapter_content})
@@ -364,6 +366,8 @@ if segmentate:
             file_names['epub'] = file_names['epub'].replace('.html.epub', '.epub')
             file_names['html'] = file_names['html'].replace('.html.html', '.html')
             file_names['html'] = file_names['html'].replace('.epub.html', '.html')
+            file_names['epub'] = re.sub(r'[^\w_. -]', '_', file_names['epub'])
+            file_names['html'] = re.sub(r'[^\w_. -]', '_', file_names['html'])
             part_metadata = dict(
                 title = part_name,
                 author = novel_metadata['author'],
@@ -383,6 +387,8 @@ if segmentate:
         file_names['epub'] = file_names['epub'].replace('.html.epub', '.epub')
         file_names['html'] = file_names['html'].replace('.html.html', '.html')
         file_names['html'] = file_names['html'].replace('.epub.html', '.html')
+        file_names['epub'] = re.sub(r'[^\w_. -]', '_', file_names['epub'])
+        file_names['html'] = re.sub(r'[^\w_. -]', '_', file_names['html'])
         part_metadata = dict(
             title = novel_metadata['title'] + ' Part ' + str(part).zfill(part_padding),
             author = novel_metadata['author'],
@@ -400,5 +406,5 @@ for part in parts:
     if 'epub' in output:
         output_epub(part['metadata'], part['chapters'])
     if 'html' in output:
-        output_epub(part['metadata'], part['chapters'])
+        output_html(part['metadata'], part['chapters'])
     
