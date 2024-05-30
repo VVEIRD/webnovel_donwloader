@@ -16,21 +16,45 @@ import re
 
 # --- Functions
 
-cache_dir = os.path.join(str(Path.home()), ".webnove_downlaoder", "cache")
+cache_dir = os.path.join(str(Path.home()), ".webnove_downloader", "cache")
+book_dir = os.path.join(str(Path.home()), ".webnove_downloader", "books")
+
+cache_enabled = True
 
 def get_cached_chapter(novel, chapter_name):
-    cached_chapter = os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel), re.sub(r'[^\w_. -]', '_', chapter_name))
-    if os.path.isfile(cached_chapter):
-        with open(cached_chapter, 'r', encoding='utf-8') as cached_file:
-            return json.load(cached_file)
+    if cache_enabled:
+        cached_chapter = os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel), re.sub(r'[^\w_. -]', '_', chapter_name) + '.json')
+        if os.path.isfile(cached_chapter):
+            with open(cached_chapter, 'r', encoding='utf-8') as cached_file:
+                return json.load(cached_file)
     return None
 
 def write_cached_chapter(novel, chapter_name, content):
-    cached_chapter = os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel), re.sub(r'[^\w_. -]', '_', chapter_name))
-    os.makedirs(os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel)), exist_ok=True)
-    with open(cached_chapter, 'w', encoding='utf-8') as cached_file:
-        cached_file.write(json.dumps(content))
+    if cache_enabled:
+        cached_chapter = os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel), re.sub(r'[^\w_. -]', '_', chapter_name) + '.json')
+        os.makedirs(os.path.join(cache_dir, re.sub(r'[^\w_. -]', '_', novel)), exist_ok=True)
+        with open(cached_chapter, 'w', encoding='utf-8') as cached_file:
+            cached_file.write(json.dumps(content))
     return content
+
+def write_book_metadata(novel_metadata):
+    book_metadata_file = os.path.join(book_dir, re.sub(r'[^\w_. -]', '_', novel_metadata['title']) + '.json')
+    os.makedirs(book_dir, exist_ok=True)
+    with open(book_metadata_file, 'w', encoding='utf-8') as cached_file:
+        cached_file.write(json.dumps(novel_metadata, indent=4))
+
+def files(path):
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path, file)):
+            yield file
+            
+def get_saved_books():
+    os.makedirs(book_dir, exist_ok=True)
+    books = []
+    for book_metadata_file in files(book_dir):
+       with open(os.path.join(book_dir, book_metadata_file), 'r', encoding='utf-8') as book_metadata:
+         books.append(json.load(book_metadata))
+    return books
 
 
 def help(exit_code=0):
@@ -42,10 +66,15 @@ def help(exit_code=0):
     print('# -    -s <NUMBER> Split the novel into parts, the number after the parameter defines how many chapters each part has')
     print('# -    -o <PATH>   Outputs novel to a specific path, use %i in the path when splitting the novel in seperate parts')
     print('# -    --help      Displays this help')
+    print('# -    --no-cache  Diables caching')
     print('# -')
     print('# - Example:')
     print('# -')
     print('# -   python download_webnovel.py -s 100 -t epub -o "test\\Test Part %i.epub" https://www.royalroad.com/fiction/12345/test')
+    print('# -')
+    print('# - Example 2, providing no url will show the already downlaoded books and provide the possibillity to update/redownload them:')
+    print('# -')
+    print('# -   python download_webnovel.py -s 100 -t epub')
     print()
     exit(exit_code)
     
@@ -271,6 +300,10 @@ output = 'epub'
 if '--help' in sys.argv:
     help()
 
+if '--no-cache' in sys.argv:
+    cache_enabled = False
+    sys.argv.remove('--no-cache')
+
 # Change the output type
 if '-t' in sys.argv:
     output = sys.argv[sys.argv.index('-t')+1]
@@ -284,22 +317,53 @@ if '-s' in sys.argv:
         print('# - Argument after -s must be an integer (you provided: {arg})'.format(arg=sys.argv[sys.argv.index('-s')+1]))
         print('# - exiting...')
         exit(2)
+    sys.argv.remove(sys.argv[sys.argv.index('-s')+1])
+    sys.argv.remove('-s')
         
-
 # Change the output destination
 if '-o' in sys.argv:
     output_override = True
     output = sys.argv[sys.argv.index('-o')+1]
+    sys.argv.remove(sys.argv[sys.argv.index('-o')+1])
+    sys.argv.remove('-o')
 
 print('# - Output(s) selected: ' + output)
 
-link = sys.argv[len(sys.argv)-1]
-
+link = sys.argv[len(sys.argv)-1]       
 source_url = 'https://www.royalroad.com' if 'www.royalroad.com' in link else 'https://www.novelhall.com' if 'https://www.novelhall.com' in link else None
-
+     
 if source_url is None:
-    print('# - Unknown site: ' + link)
-    help(1)
+    books = get_saved_books()
+    if len(books) == 0:
+        print('# - Unknown site: ' + link)
+        help(1)
+    else:
+        print('# - No valid URL provided')
+        print('# - Known books: ')
+        counter = 0
+        for book in books:
+            print(('#   * {:0' + str(len(str(len(books)))) + 'd} - ').format(counter) + book['title'])
+            counter = counter + 1
+        print('# - Choos from 0 to ' + str(len(books)) + ' to update one of the books, type c for cancel')
+        choice = input('# > ')
+        if 'c' == choice:
+            help(1)
+        else:
+            try:
+                book_no = int(choice)
+            except ValueError as valErr:
+                print('# - Input not a number or c')
+                print('# - exiting...')
+                exit(2)
+            if book_no < 0 or book_no > len(books):
+                print('# - Input outside of range')
+                print('# - exiting...')
+                exit(2)
+            link = books[book_no]['novel_url']
+        
+source_url = 'https://www.royalroad.com' if 'www.royalroad.com' in link else 'https://www.novelhall.com' if 'https://www.novelhall.com' in link else None
+        
+        
  
 print('# - Reading novel from: royalroad' if 'royalroad' in source_url else '# - Reading novel from: novelhall')
 
@@ -319,6 +383,7 @@ book = Selector(website_data)
 # -- Load Metadata
 
 novel_metadata = get_novel_metadata(website_data, source_url)
+novel_metadata['novel_url'] = link
 chapter_links = get_chapters(website_data, source_url)
 novel_metadata['file_name'] = dict(
     epub = (novel_metadata['title'] if not output_override else output) + '.epub',
@@ -327,6 +392,8 @@ novel_metadata['file_name'] = dict(
 
 print('# - Book Title:         ' + novel_metadata['title']) 
 print('# - Author:             ' + novel_metadata['author']) 
+
+write_book_metadata(novel_metadata)
 
 # --- Read Chapters
 
@@ -378,6 +445,7 @@ if segmentate:
             parts.append({'metadata': part_metadata, 'chapters': segment})
             part = part + 1
             segment = []
+            segment.append(chapters[i])
     if len(segment) > 0:
         file_names = dict(
             epub = (part_name if not output_override else output.replace('%i', str(part).zfill(part_padding))) + '.epub',
