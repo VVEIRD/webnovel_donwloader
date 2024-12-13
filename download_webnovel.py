@@ -85,7 +85,25 @@ def get_novel_metadata(website_data, source_url):
     title = None
     author = 'Unknown'
     book = Selector(website_data)
-    if 'royalroad' in source_url:
+    if 'novelbin.me' in source_url:
+        try:
+            title = book.xpath('/html/body/div/main/div[2]/div[1]/div[1]/div[3]/h3/text()').getall()[0]
+        except Exception:
+            pass
+        try:  
+            author = book.xpath('/html/body/div/main/div[2]/div[1]/div[1]/div[3]/ul/li[1]/a/text()').getall()[0]
+        except Exception:
+            pass
+    elif 'web.archive.org' in source_url:
+        try:
+            title = book.xpath('/html/body/div[5]/div/div/div/div[1]/div/div[1]/div[2]/div/h1/text()').getall()[0]
+        except Exception:
+            pass
+        try:  
+            author = book.xpath('/html/body/div[5]/div/div/div/div[1]/div/div[1]/div[2]/div/h4/span[2]/a/text()').getall()[0]
+        except Exception:
+            pass
+    elif 'royalroad' in source_url:
         try:
             title = book.xpath('/html/body/div[3]/div/div/div/div[1]/div/div[1]/div[2]/div/h1/text()').getall()[0]
         except Exception:
@@ -109,16 +127,18 @@ def get_novel_metadata(website_data, source_url):
 def get_chapters(website_data, source_url):
     chapters = None
     book = Selector(website_data)
-    if 'royalroad' in source_url:
+    if 'royalroad' in source_url or 'web.archive.org' in source_url:
         chapters = book.xpath('//*[@id="chapters"]/tbody/tr/td/a/@href').getall()
     elif 'novelhall' in source_url:
         cont = book.xpath('//*[@id="morelist"]').getall()
         for entry in cont:
             chapters = Selector(entry).xpath('//div/ul/li/a/@href').getall()
+    elif 'novelbin' in source_url:
+        chapters = book.xpath('/html/body/div/div/div/div[*]/div[*]/ul/li[*]/a/@href').getall()
     return chapters
     
 def get_chapter(source_url, chapter_path):
-    url = source_url + chapter_path
+    url = source_url + chapter_path.replace(source_url, '')
     chapter_title = ''
     chapter_content = None
     req = urllib.request.Request(
@@ -142,6 +162,13 @@ def get_chapter(source_url, chapter_path):
     elif 'novelhall' in source_url:
         chapter_title = chapter_selector.xpath('//article/div[1]/h1/text()').getall()[0]
         cont = chapter_selector.xpath('//*[@id="htmlContent"]').getall()
+        for chapter_part in cont:
+            if chapter_content is None:
+                chapter_content = ''
+            chapter_content = chapter_content + '\r\n' + chapter_part
+    elif 'novelbin' in source_url:
+        chapter_title = chapter_selector.xpath('/html/body/div/main/div[3]/div/div/div[2]/h3/text()').getall()[0]
+        cont = chapter_selector.xpath('//*[@id="chr-content"]').getall()
         for chapter_part in cont:
             if chapter_content is None:
                 chapter_content = ''
@@ -330,8 +357,18 @@ if '-o' in sys.argv:
 print('# - Output(s) selected: ' + output)
 
 link = sys.argv[len(sys.argv)-1]       
-source_url = 'https://www.royalroad.com' if 'www.royalroad.com' in link else 'https://www.novelhall.com' if 'https://www.novelhall.com' in link else None
-     
+
+source_url = None 
+
+if 'novelbin.me' in link:
+  source_url = 'https://novelbin.me'
+elif 'web.archive.org' in link:
+  source_url = 'https://web.archive.org'
+elif 'www.royalroad.com' in link:
+  source_url = 'https://www.royalroad.com'
+elif  'www.novelhall.com' in link:
+  source_url = 'https://www.novelhall.com'
+  
 if source_url is None:
     books = get_saved_books()
     if len(books) == 0:
@@ -360,14 +397,21 @@ if source_url is None:
                 print('# - exiting...')
                 exit(2)
             link = books[book_no]['novel_url']
-        
-source_url = 'https://www.royalroad.com' if 'www.royalroad.com' in link else 'https://www.novelhall.com' if 'https://www.novelhall.com' in link else None
-        
+  
+if 'novelbin.me' in link:
+  source_url = 'https://novelbin.me'
+elif 'web.archive.org' in link:
+  source_url = 'https://web.archive.org'
+elif 'www.royalroad.com' in link:
+  source_url = 'https://www.royalroad.com'
+elif  'www.novelhall.com' in link:
+  source_url = 'https://www.novelhall.com'
         
  
 print('# - Reading novel from: royalroad' if 'royalroad' in source_url else '# - Reading novel from: novelhall')
 
-print('# - Novel URL:          ' + link) 
+print('# - Novel URL:           ' + link) 
+print('# - SOURCE URL:          ' + source_url) 
 
 req = urllib.request.Request(
     link, 
@@ -378,13 +422,25 @@ req = urllib.request.Request(
 )
 f = urllib.request.urlopen(req)
 website_data = f.read().decode('utf-8')
+website_data_chapters = website_data
+if 'novelbin' in source_url:
+    # on-astral-tides-from-humble-freelancer-to-astral-emperor
+    chapter_link = 'https://novelbin.me/ajax/chapter-archive?novelId=' + link.split('/')[-1]
+    req = urllib.request.Request(
+        chapter_link, 
+        data=None, 
+        headers={
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/35.0.1916.47 Safari/537.36'
+        }
+    )   
+    website_data_chapters = urllib.request.urlopen(req).read().decode('utf-8')
 book = Selector(website_data)
 
 # -- Load Metadata
 
 novel_metadata = get_novel_metadata(website_data, source_url)
 novel_metadata['novel_url'] = link
-chapter_links = get_chapters(website_data, source_url)
+chapter_links = get_chapters(website_data_chapters, source_url)
 novel_metadata['file_name'] = dict(
     epub = (novel_metadata['title'] if not output_override else output) + '.epub',
     html = (novel_metadata['title'] if not output_override else output) + '.html'
